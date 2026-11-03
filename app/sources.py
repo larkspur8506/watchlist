@@ -135,6 +135,11 @@ def fetch_sina_lse(symbols):
 
 
 # ---------- BTC ----------
+# oracle1 在新加坡/美国区域，api.binance.com 直接返回 451「restricted location」；
+# data-api.binance.vision 是官方公开行情镜像，同一份数据、不挑地区，故做首选。
+BTC_HOSTS = ("https://data-api.binance.vision", "https://api.binance.com")
+
+
 def parse_binance(d):
     return {"price": _f(d.get("lastPrice")), "prev_close": _f(d.get("prevClosePrice")),
             "chg": _f(d.get("priceChange")), "chg_pct": _f(d.get("priceChangePercent")),
@@ -142,9 +147,18 @@ def parse_binance(d):
 
 
 def fetch_btc():
-    d = json.loads(_http("https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT"))
-    q = parse_binance(d)
-    return {"BTC": q} if q["price"] else {}
+    last_err = None
+    for host in BTC_HOSTS:
+        try:
+            d = json.loads(_http(host + "/api/v3/ticker/24hr?symbol=BTCUSDT"))
+            q = parse_binance(d)
+            if q["price"]:
+                return {"BTC": q}
+        except Exception as e:  # 451 是地区限制，换镜像继续
+            last_err = e
+    if last_err:
+        raise last_err
+    return {}
 
 
 # ---------- 迷你走势（近 N 个收盘价） ----------
@@ -181,7 +195,14 @@ def fetch_spark_tencent(code, n=20):
 
 
 def fetch_spark_crypto(sym="BTCUSDT", n=20):
-    """Binance 日线收盘（加密货币唯一在用的走势源）。"""
-    d = json.loads(_http("https://api.binance.com/api/v3/klines?symbol=%s&interval=1d&limit=%d"
-                         % (sym, n)))
-    return [_f(r[4]) for r in d if len(r) > 4 and _f(r[4]) is not None]
+    """Binance 日线收盘（加密货币唯一在用的走势源）；同 fetch_btc 走 .vision 镜像。"""
+    for host in BTC_HOSTS:
+        try:
+            d = json.loads(_http("%s/api/v3/klines?symbol=%s&interval=1d&limit=%d"
+                                 % (host, sym, n)))
+            out = [_f(r[4]) for r in d if len(r) > 4 and _f(r[4]) is not None]
+            if out:
+                return out
+        except Exception:
+            continue
+    return []

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """解析层单测：样本全部是实测抓到的原始响应（截断到必要字段）。"""
+import json
 import unittest
+import urllib.error
 
 from app import sources
 
@@ -102,6 +104,26 @@ class TestBinance(unittest.TestCase):
                                    "priceChange": "-1470.62", "priceChangePercent": "-1.873"})
         self.assertEqual(q["price"], 77051.38)
         self.assertAlmostEqual(q["chg_pct"], -1.873)
+
+    def test_geo_blocked_host_falls_back_to_mirror(self):
+        """回归：oracle1 上 api.binance.com 返回 451，必须能自动换 .vision 镜像。"""
+        seen = []
+
+        def fake_http(url, headers=None, timeout=8):
+            seen.append(url)
+            if "data-api.binance.vision" not in url:
+                raise urllib.error.HTTPError(url, 451, "restricted location", {}, None)
+            return json.dumps({"lastPrice": "77000", "prevClosePrice": "78000",
+                               "priceChange": "-1000", "priceChangePercent": "-1.28"}).encode()
+
+        old = sources._http
+        sources._http = fake_http
+        try:
+            q = sources.fetch_btc()
+        finally:
+            sources._http = old
+        self.assertEqual(q["BTC"]["price"], 77000.0)
+        self.assertIn("data-api.binance.vision", seen[0])  # 首选镜像，一次就成功
 
 
 if __name__ == "__main__":
