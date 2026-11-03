@@ -64,7 +64,7 @@ def refresh_once():
     except Exception:
         _stamp("sina_lse", False)
     try:
-        q = sources.fetch_btc()
+        q = sources.fetch_crypto(cfg.CRYPTO_PAIRS)
         _stamp("binance", bool(q))
         with LOCK:
             _merge(q, "crypto")
@@ -86,7 +86,9 @@ def refresh_sparks():
                 if it["market"] == "us":
                     s = sources.fetch_spark_us(it["sym"])
                 elif it["market"] == "crypto":
-                    s = sources.fetch_spark_crypto()
+                    s = sources.fetch_spark_crypto(cfg.CRYPTO_PAIRS[it["sym"]])
+                elif it["market"] == "lse":
+                    s = sources.fetch_spark_lse(it["sym"])
                 else:
                     s = []
                 if s:

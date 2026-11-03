@@ -9,7 +9,7 @@ GROUPS = [
     ("收入", ["SCHD", "DIVO", "GPIQ"]),
     ("增值", ["VOOG", "SPMO", "AVLV", "AVDV", "SCHG", "SCHV", "IDMO", "AVUV", "FRDM", "AVGE"]),
     ("伦敦", ["IITU", "VUAG"]),
-    ("加密", ["BTC"]),
+    ("加密", ["BTC", "ETH", "SOL"]),
 ]
 
 # 每个标的的市场 + 报价币种
@@ -23,8 +23,11 @@ MARKETS = {
     # 伦敦（便士 / 英镑）
     "IITU": ("lse", "GBX"), "VUAG": ("lse", "GBP"),
     # 加密
-    "BTC": ("crypto", "USD"),
+    "BTC": ("crypto", "USD"), "ETH": ("crypto", "USD"), "SOL": ("crypto", "USD"),
 }
+
+# 加密标的 → Binance 交易对
+CRYPTO_PAIRS = {"BTC": "BTCUSDT", "ETH": "ETHUSDT", "SOL": "SOLUSDT"}
 
 # 页面上的中文短名（源里给的名字太长，移动端一行放不下）；缺省用源返回的名字
 NAMES = {
@@ -33,7 +36,7 @@ NAMES = {
     "AVDV": "Avantis 国际小盘价值", "SCHG": "Schwab 美国成长", "SCHV": "Schwab 美国价值",
     "IDMO": "Invesco 国际动量", "AVUV": "Avantis 美小盘价值", "FRDM": "自由新兴市场",
     "AVGE": "Avantis 全球全市场", "IITU": "iShares 标普科技", "VUAG": "先锋 S&P500 累积",
-    "BTC": "比特币",
+    "BTC": "比特币", "ETH": "以太坊", "SOL": "Solana",
 }
 
 

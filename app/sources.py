@@ -101,8 +101,9 @@ def fetch_sina_us(symbols):
 
 
 # ---------- 新浪伦敦 ----------
-# 实测字段（0 起）：0=代码 1=昨收 2=最高 3=开盘 4=最低 5=现价 6=成交量 7=成交额 8=时间
-# 校准方法：现价必须落在 [最低, 最高] 之间，且 昨收 与 现价 同量级（IITU 用便士、VUAG 用英镑）。
+# 实测字段（0 起）：0=代码 1=现价 2=最高 3=开盘 4=最低 5=昨收 6=成交量 7=成交额 8=时间
+# 校准方法：拿 Wealthfolio 存的日收盘对账（2026-11-03：IITU 11-02 收 3721 = parts[1]，
+# 10-30 收 3733 = parts[5]）。最初把 [1]/[5] 读反，涨跌幅符号整个是反的——别凭直觉改。
 def parse_sina_lse(text):
     out = {}
     for line in text.splitlines():
@@ -112,7 +113,7 @@ def parse_sina_lse(text):
         parts = m.group(2).split(",")
         if len(parts) < 6:
             continue
-        prev, high, _open, low, last = (_f(parts[1]), _f(parts[2]), _f(parts[3]),
+        last, high, _open, low, prev = (_f(parts[1]), _f(parts[2]), _f(parts[3]),
                                         _f(parts[4]), _f(parts[5]))
         if not last or not prev:
             continue
@@ -146,19 +147,24 @@ def parse_binance(d):
             "ts": "", "name": "Bitcoin"}
 
 
-def fetch_btc():
-    last_err = None
+def fetch_crypto(pairs):
+    """pairs: {页面代码: Binance 交易对}，如 {"BTC": "BTCUSDT"}。返回 {代码: quote}。"""
+    out, last_err = {}, None
     for host in BTC_HOSTS:
         try:
-            d = json.loads(_http(host + "/api/v3/ticker/24hr?symbol=BTCUSDT"))
-            q = parse_binance(d)
-            if q["price"]:
-                return {"BTC": q}
-        except Exception as e:  # 451 是地区限制，换镜像继续
+            got = {}
+            for sym, pair in pairs.items():
+                d = json.loads(_http("%s/api/v3/ticker/24hr?symbol=%s" % (host, pair)))
+                q = parse_binance(d)
+                if q["price"]:
+                    got[sym] = q
+            if got:
+                return got
+        except Exception as e:  # 451 = 地区限制，换镜像继续
             last_err = e
     if last_err:
         raise last_err
-    return {}
+    return out
 
 
 # ---------- 迷你走势（近 N 个收盘价） ----------
@@ -194,12 +200,35 @@ def fetch_spark_tencent(code, n=20):
     return []
 
 
-def fetch_spark_crypto(sym="BTCUSDT", n=20):
-    """Binance 日线收盘（加密货币唯一在用的走势源）；同 fetch_btc 走 .vision 镜像。"""
+def fetch_spark_lse(sym, n=20, db=None):
+    """伦敦这两只没有公开的免费日线接口（Yahoo 429、stooq 要 JS、LSE API 403）。
+    改用 Wealthfolio 自己存的日收盘：同币种、同一挂牌、每天同步，只读打开。
+    DB 不存在或没数据就返回空列表 —— 页面那一行只是没有迷你线，不影响报价。"""
+    import os
+    import sqlite3
+    db = db or os.environ.get("WF_DB", "/data/wf.db")
+    if not os.path.exists(db):
+        return []
+    try:
+        con = sqlite3.connect("file:%s?mode=ro" % db, uri=True, timeout=5)
+        try:
+            rows = con.execute(
+                "select q.close from quotes q join assets a on a.id = q.asset_id "
+                "where a.display_code = ? order by q.day desc limit ?", (sym, n)).fetchall()
+        finally:
+            con.close()
+        closes = [_f(r[0]) for r in rows]
+        return [c for c in closes if c is not None][::-1]
+    except Exception:
+        return []
+
+
+def fetch_spark_crypto(pair="BTCUSDT", n=20):
+    """Binance 日线收盘；同 fetch_crypto 走 .vision 镜像。"""
     for host in BTC_HOSTS:
         try:
             d = json.loads(_http("%s/api/v3/klines?symbol=%s&interval=1d&limit=%d"
-                                 % (host, sym, n)))
+                                 % (host, pair, n)))
             out = [_f(r[4]) for r in d if len(r) > 4 and _f(r[4]) is not None]
             if out:
                 return out

@@ -33,7 +33,12 @@ oracle1 上以 host 网络跑在 `127.0.0.1:8130`，1Panel 反代 `wl.sqqq.de5.n
 
 ```bash
 docker run -d --name watchlist --network host --restart unless-stopped \
-  --env-file /opt/watchlist/.env ghcr.io/larkspur8506/watchlist:latest
+  --env-file /opt/watchlist/.env --memory 192m \
+  -v /var/lib/docker/volumes/wealthfolio/_data/wealthfolio.db:/data/wf.db:ro \
+  ghcr.io/larkspur8506/watchlist:latest
 ```
 
-`.env`：`WATCH_TOKEN=<口令>`、`WATCH_PORT=8130`、`WATCH_REFRESH_S=5`
+`.env`：`WATCH_TOKEN=<口令>`、`WATCH_PORT=8130`、`WATCH_REFRESH_S=5`、`WF_DB=/data/wf.db`
+
+伦敦两只（IITU/VUAG）的迷你走势来自 Wealthfolio 的 `quotes` 表（同币种日收盘），
+所以挂了这个只读卷；DB 不在时只是没有迷你线，不影响报价。

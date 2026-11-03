@@ -61,14 +61,18 @@ class TestSinaUS(unittest.TestCase):
 
 class TestSinaLSE(unittest.TestCase):
     def test_pence_and_pounds_units(self):
+        # 期望值用 Wealthfolio 的日收盘对账过：IITU 11-02 收 3721p、10-30 收 3733p；
+        # VUAG 11-02 收 110.10 GBP、10-30 收 109.78 GBP。涨跌方向不能反。
         q = sources.parse_sina_lse(SINA_LSE)
-        self.assertEqual(q["IITU"]["price"], 3733)      # 便士
-        self.assertEqual(q["VUAG"]["price"], 109.78)    # 英镑
-        self.assertAlmostEqual(q["IITU"]["chg_pct"], round((3733 / 3721 - 1) * 100, 2))
-        self.assertAlmostEqual(q["VUAG"]["chg_pct"], round((109.78 / 110.1 - 1) * 100, 2))
+        self.assertEqual(q["IITU"]["price"], 3721)        # 便士
+        self.assertEqual(q["VUAG"]["price"], 110.10)      # 英镑
+        self.assertAlmostEqual(q["IITU"]["chg_pct"], round((3721 / 3733 - 1) * 100, 2))
+        self.assertAlmostEqual(q["VUAG"]["chg_pct"], round((110.10 / 109.78 - 1) * 100, 2))
+        self.assertLess(q["IITU"]["chg_pct"], 0)          # IITU 当期是跌的，符号钉死
 
     def test_out_of_range_row_is_dropped(self):
-        bad = 'var hq_str_lse_xxx="xxx,100,101,100,99,150,0,0,2026-11-02 16:00:00";'
+        # 现价 150 落在 [99,101] 之外 = 字段错位，必须整行丢弃而不是硬算
+        bad = 'var hq_str_lse_xxx="xxx,150,101,100,99,120,0,0,2026-11-02 16:00:00";'
         self.assertEqual(sources.parse_sina_lse(bad), {})
 
 
@@ -119,11 +123,39 @@ class TestBinance(unittest.TestCase):
         old = sources._http
         sources._http = fake_http
         try:
-            q = sources.fetch_btc()
+            q = sources.fetch_crypto({"BTC": "BTCUSDT"})
         finally:
             sources._http = old
         self.assertEqual(q["BTC"]["price"], 77000.0)
         self.assertIn("data-api.binance.vision", seen[0])  # 首选镜像，一次就成功
+
+
+class TestSparkLSE(unittest.TestCase):
+    """LSE 迷你线来自 Wealthfolio 的 quotes 表（临时库造数据，不依赖真库）。"""
+
+    def _make_db(self, tmpdir):
+        import os, sqlite3
+        db = os.path.join(tmpdir, "wf.db")
+        con = sqlite3.connect(db)
+        con.executescript("""
+            create table assets (id text, display_code text);
+            create table quotes (asset_id text, day text, close text);
+            insert into assets values ('a1','IITU');
+            insert into quotes values ('a1','2026-10-28','3947');
+            insert into quotes values ('a1','2026-10-29','3898');
+            insert into quotes values ('a1','2026-11-02','3721');
+        """)
+        con.commit(); con.close()
+        return db
+
+    def test_reads_daily_closes_in_ascending_order(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            db = self._make_db(d)
+            self.assertEqual(sources.fetch_spark_lse("IITU", 20, db=db), [3947.0, 3898.0, 3721.0])
+
+    def test_missing_db_returns_empty_not_raise(self):
+        self.assertEqual(sources.fetch_spark_lse("IITU", 20, db="/nonexistent/wf.db"), [])
 
 
 if __name__ == "__main__":
