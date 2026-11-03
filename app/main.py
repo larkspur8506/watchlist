@@ -192,8 +192,10 @@ def main():
 
     threading.Thread(target=loop, daemon=True).start()
     port = int(os.environ.get("WATCH_PORT", "8130"))
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    print("watchlist listening on 127.0.0.1:%d" % port, flush=True)
+    # 生产用 127.0.0.1（1Panel 反代同机）；CI 冒烟容器需要 0.0.0.0 才能被 -p 映射到。
+    bind = os.environ.get("WATCH_BIND", "127.0.0.1")
+    srv = ThreadingHTTPServer((bind, port), Handler)
+    print("watchlist listening on %s:%d" % (bind, port), flush=True)
     srv.serve_forever()
 
 
