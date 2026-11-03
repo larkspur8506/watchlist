@@ -1,0 +1,76 @@
+/* 自选聚合页 —— 富途自选列表的版式：暗底、无卡片、分组吸顶、右侧迷你走势 */
+:root{
+  --bg:#0a0a0b; --bg2:#121214; --line:#1e1e22;
+  --txt:#e8e8ea; --dim:#8b8b93; --dim2:#5f5f68;
+  --up:#f6465d; --down:#0ecb81;      /* 红涨绿跌（中国习惯） */
+  --warn:#f0b90b;
+  --row:56px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{max-width:100%;overflow-x:hidden;margin:0}
+body{
+  background:var(--bg);color:var(--txt);
+  font:400 15px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",
+       "Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  font-variant-numeric:tabular-nums;
+  padding-bottom:calc(52px + env(safe-area-inset-bottom));
+}
+
+/* ---------- 头部 ---------- */
+.hd{
+  position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+  background:rgba(10,10,11,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);
+}
+.hd-l{display:flex;align-items:baseline;gap:10px;min-width:0}
+.hd-l h1{font-size:20px;font-weight:650;margin:0;letter-spacing:.5px}
+.stamp{font-size:11px;color:var(--dim2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hd-r{display:flex;align-items:center;gap:10px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--down);opacity:.9}
+.dot.warn{background:var(--warn)}
+.dot.err{background:var(--up)}
+.iconbtn{
+  background:none;border:1px solid var(--line);color:var(--dim);border-radius:8px;
+  width:30px;height:30px;font-size:15px;line-height:1;cursor:pointer;
+}
+.iconbtn:active{background:var(--bg2)}
+
+/* ---------- 分组 ---------- */
+.grp{
+  position:sticky;z-index:10;display:flex;justify-content:space-between;
+  padding:8px 16px 6px;background:var(--bg);
+  font-size:11px;color:var(--dim2);letter-spacing:.8px;
+}
+.grp .gl{font-weight:600;color:var(--dim)}
+
+/* ---------- 行 ---------- */
+.row{
+  display:flex;align-items:center;gap:8px;height:var(--row);padding:0 16px;
+  border-bottom:1px solid #151518;
+}
+.row:active{background:#141417}
+.row.stale{opacity:.45}
+.id{flex:1 1 auto;min-width:0}
+.sym{font-size:14.5px;font-weight:600;letter-spacing:.3px;white-space:nowrap}
+.nm{font-size:11px;color:var(--dim2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.px{flex:0 0 auto;text-align:right;min-width:74px;font-size:14.5px}
+.pct{flex:0 0 auto;text-align:right;min-width:64px;font-size:13.5px;font-weight:600}
+.spark{flex:0 0 auto;width:48px;height:20px;display:block}
+.up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--dim)}
+.cur{font-size:10px;color:var(--dim2);margin-left:2px}
+
+/* ---------- 底部汇总 ---------- */
+.ft{
+  position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;align-items:center;gap:14px;
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+  background:rgba(10,10,11,.94);backdrop-filter:blur(12px);border-top:1px solid var(--line);
+  font-size:12px;color:var(--dim);
+}
+.ft b{font-weight:650;color:var(--txt)}
+.ft .sum:nth-child(1) b{color:var(--up)}
+.ft .sum:nth-child(2) b{color:var(--down)}
+.note{margin-left:auto;color:var(--dim2);font-size:11px;text-align:right}
+.note.warn{color:var(--warn)}
+
+.loading,.error{padding:40px 16px;text-align:center;color:var(--dim2);font-size:13px}
+.error{color:var(--up)}

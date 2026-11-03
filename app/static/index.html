@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
+<title>自选</title>
+<link rel="stylesheet" href="/app.css">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon.svg">
+</head>
+<body>
+<header class="hd">
+  <div class="hd-l">
+    <h1>自选</h1>
+    <span id="stamp" class="stamp">—</span>
+  </div>
+  <div class="hd-r">
+    <span id="dot" class="dot" title="数据源状态"></span>
+    <button id="refresh" class="iconbtn" aria-label="刷新">⟳</button>
+  </div>
+</header>
+
+<main id="list" class="list"><div class="loading">加载中…</div></main>
+
+<footer class="ft">
+  <span class="sum"><b id="up">0</b> 涨</span>
+  <span class="sum"><b id="down">0</b> 跌</span>
+  <span class="sum"><b id="flat">0</b> 平</span>
+  <span id="note" class="note"></span>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>
