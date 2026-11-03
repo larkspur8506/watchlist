@@ -157,6 +157,22 @@ class TestSparkLSE(unittest.TestCase):
     def test_missing_db_returns_empty_not_raise(self):
         self.assertEqual(sources.fetch_spark_lse("IITU", 20, db="/nonexistent/wf.db"), [])
 
+    def test_stale_wf_data_hides_the_line(self):
+        """WF 停更时不能拿旧线冒充新线：最后一根超过 5 个自然日就返回空。"""
+        import os, sqlite3, tempfile
+        with tempfile.TemporaryDirectory() as d:
+            db = os.path.join(d, "wf.db")
+            con = sqlite3.connect(db)
+            con.executescript("""
+                create table assets (id text, display_code text);
+                create table quotes (asset_id text, day text, close text);
+                insert into assets values ('a1','IITU');
+                insert into quotes values ('a1','2026-01-05','3500');
+                insert into quotes values ('a1','2026-01-06','3510');
+            """)
+            con.commit(); con.close()
+            self.assertEqual(sources.fetch_spark_lse("IITU", 20, db=db), [])
+
 
 if __name__ == "__main__":
     unittest.main()

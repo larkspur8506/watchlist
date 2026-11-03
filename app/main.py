@@ -2,8 +2,8 @@
 """watchlist 聚合服务：零依赖（stdlib），对外两个接口 + 一个静态页。
 
 GET /health            无需 token，返回各源最近成功时间，供 1Panel/巡检探活
-GET /api/quotes?k=..   全量 JSON（缓存，5s 后台刷新）
-GET /                  单页（前端自己从 URL 的 ?k= 取 token 调 /api/quotes）
+GET /api/quotes        全量 JSON（缓存，5s 后台刷新；页面无隐私数据，不设口令）
+GET /                  单页
 
 纪律：抓取失败保留上一份数值并打 stale=True，绝不给 0.00%（假平盘比没数据更误导）。
 """
@@ -12,12 +12,11 @@ import os
 import threading
 import time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 from . import sources, symbols as cfg
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-TOKEN = os.environ.get("WATCH_TOKEN", "")
 REFRESH_S = int(os.environ.get("WATCH_REFRESH_S", "5"))
 SPARK_TTL = 600  # 迷你走势 10 分钟刷一次
 
@@ -149,19 +148,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         u = urlparse(self.path)
-        qs = parse_qs(u.query)
-        key = (qs.get("k") or [""])[0]
         if u.path == "/health":
             return self._send(200, {"ok": True, "updated_at": _now_iso(CACHE["updated_at"] or None),
                                     "sources": CACHE["sources"]})
         if u.path == "/api/quotes":
-            if TOKEN and key != TOKEN:
-                return self._send(401, {"error": "unauthorized"})
             return self._send(200, payload())
         if u.path in ("/", "/index.html"):
-            if TOKEN and key != TOKEN:
-                return self._send(401, "<h1>401</h1><p>缺少或错误的访问口令（?k=…）</p>",
-                                  "text/html; charset=utf-8")
             return self._serve_static("index.html")
         return self._serve_static(u.path.lstrip("/"))
 

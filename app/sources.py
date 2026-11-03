@@ -203,9 +203,11 @@ def fetch_spark_tencent(code, n=20):
 def fetch_spark_lse(sym, n=20, db=None):
     """伦敦这两只没有公开的免费日线接口（Yahoo 429、stooq 要 JS、LSE API 403）。
     改用 Wealthfolio 自己存的日收盘：同币种、同一挂牌、每天同步，只读打开。
-    DB 不存在或没数据就返回空列表 —— 页面那一行只是没有迷你线，不影响报价。"""
+    DB 不存在、没数据、或最后一根超过 5 个自然日（WF 停了/同步失败）就返回空 —
+    页面那一行只是没有迷你线，不影响报价，也绝不会把旧线伪装成新线。"""
     import os
     import sqlite3
+    from datetime import date, datetime
     db = db or os.environ.get("WF_DB", "/data/wf.db")
     if not os.path.exists(db):
         return []
@@ -213,11 +215,20 @@ def fetch_spark_lse(sym, n=20, db=None):
         con = sqlite3.connect("file:%s?mode=ro" % db, uri=True, timeout=5)
         try:
             rows = con.execute(
-                "select q.close from quotes q join assets a on a.id = q.asset_id "
+                "select q.day, q.close from quotes q join assets a on a.id = q.asset_id "
                 "where a.display_code = ? order by q.day desc limit ?", (sym, n)).fetchall()
         finally:
             con.close()
-        closes = [_f(r[0]) for r in rows]
+        if not rows:
+            return []
+        last_day = rows[0][0]
+        try:
+            age = (date.today() - datetime.strptime(last_day, "%Y-%m-%d").date()).days
+        except Exception:
+            age = 0
+        if age > 5:  # 周末 + 假日的正常跨度上限
+            return []
+        closes = [_f(r[1]) for r in rows]
         return [c for c in closes if c is not None][::-1]
     except Exception:
         return []

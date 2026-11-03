@@ -1,10 +1,6 @@
 /* 自选聚合页前端：拉 /api/quotes、渲染分组、5s 轮询（页面隐藏时暂停） */
 (function () {
   "use strict";
-  var qs = new URLSearchParams(location.search);
-  var token = qs.get("k") || localStorage.getItem("wk_token") || "";
-  if (qs.get("k")) localStorage.setItem("wk_token", qs.get("k"));
-
   var $list = document.getElementById("list");
   var $stamp = document.getElementById("stamp");
   var $dot = document.getElementById("dot");
@@ -88,21 +84,14 @@
   }
 
   function load() {
-    var url = "/api/quotes" + (token ? "?k=" + encodeURIComponent(token) : "");
-    fetch(url, { cache: "no-store" }).then(function (r) {
-      if (r.status === 401) throw new Error("401");
+    fetch("/api/quotes", { cache: "no-store" }).then(function (r) {
       return r.json();
     }).then(function (d) {
       render(d);
     }).catch(function (e) {
       $dot.className = "dot err";
-      if (String(e.message) === "401") {
-        $list.innerHTML = '<div class="error">访问口令无效 —— 用带 ?k=… 的链接打开</div>';
-        if (timer) { clearInterval(timer); timer = null; }
-      } else {
-        $note.className = "note warn";
-        $note.textContent = "行情拉取失败，重试中…";
-      }
+      $note.className = "note warn";
+      $note.textContent = "行情拉取失败，重试中…";
     });
   }
 
