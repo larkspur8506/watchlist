@@ -80,7 +80,7 @@ def refresh_once():
 
 def refresh_sparks():
     while True:
-        for it in list(CACHE["items"]):
+        def one(it):
             try:
                 if it["market"] == "us":
                     s = sources.fetch_spark_us(it["sym"])
@@ -90,12 +90,31 @@ def refresh_sparks():
                     s = sources.fetch_spark_lse(it["sym"])
                 else:
                     s = []
-                if s:
-                    with LOCK:
-                        CACHE["sparks"][it["sym"]] = s
             except Exception:
-                pass
-            time.sleep(0.4)  # 串行 + 间隔，避免被新浪限速
+                s = []
+            if s:
+                with LOCK:
+                    CACHE["sparks"][it["sym"]] = s
+            return bool(s)
+
+        items = list(CACHE["items"])
+        missing = []
+        for it in items:
+            if not one(it):
+                missing.append(it)
+            time.sleep(0.8)  # 串行 + 间隔，避免被新浪限速（连发第 13 个曾返回空）
+        if missing:  # 补一轮：给瞬时限流留时间，别让某只票整整 10 分钟没有线
+            time.sleep(45)
+            for it in missing:
+                one(it)
+                time.sleep(1.5)
+        with LOCK:
+            CACHE["spark_status"] = {
+                "at": _now_iso(),
+                "total": len(items),
+                "ok": sum(1 for it in items if CACHE["sparks"].get(it["sym"])),
+                "missing": [it["sym"] for it in items if not CACHE["sparks"].get(it["sym"])],
+            }
         time.sleep(SPARK_TTL)
 
 
@@ -150,7 +169,8 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         if u.path == "/health":
             return self._send(200, {"ok": True, "updated_at": _now_iso(CACHE["updated_at"] or None),
-                                    "sources": CACHE["sources"]})
+                                    "sources": CACHE["sources"],
+                                    "sparks": CACHE.get("spark_status", {})})
         if u.path == "/api/quotes":
             return self._send(200, payload())
         if u.path in ("/", "/index.html"):

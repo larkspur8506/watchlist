@@ -181,12 +181,44 @@ def parse_sina_dailyk(text, n=20):
     return [c for c in closes if c is not None][-n:]
 
 
+# ---------- 备用：Nasdaq 官方历史接口（新浪偶尔对个别标的/连发请求返回空） ----------
+def parse_nasdaq_hist(payload, n=20):
+    rows = ((payload or {}).get("data") or {}).get("tradesTable", {}).get("rows") or []
+    closes = []
+    for r in rows:  # 接口按日期从新到旧返回
+        v = _f((r.get("close") or "").replace("$", ""))
+        if v is not None:
+            closes.append(v)
+    closes.reverse()
+    return closes[-n:]
+
+
+def fetch_spark_nasdaq(sym, n=20):
+    from datetime import date, timedelta
+    end = date.today()
+    start = end - timedelta(days=120)
+    url = ("https://api.nasdaq.com/api/quote/%s/historical?assetclass=etf"
+           "&fromdate=%s&todate=%s&limit=200" % (sym.upper(), start, end))
+    d = json.loads(_http(url, headers={"Accept": "application/json"}, timeout=12))
+    return parse_nasdaq_hist(d, n)
+
+
 def fetch_spark_us(sym, n=20):
     # 注意：URL 里有 %20（JSONP 回调名里的空格），绝不能对整条字符串做 % 格式化，
     # 否则 %2 会被当成格式符吃掉（踩过一次）。
+    # 新浪对「连续第 13 个请求」这类连发偶发返回空（AVGE 实案），所以空了就退 Nasdaq 官方接口。
     url = ("https://stock.finance.sina.com.cn/usstock/api/jsonp.php/var%20k/"
            "US_MinKService.getDailyK?symbol=" + sym.upper())
-    return parse_sina_dailyk(_gbk(_http(url, headers={"Referer": SINA_REFERER}, timeout=10)), n)
+    try:
+        got = parse_sina_dailyk(_gbk(_http(url, headers={"Referer": SINA_REFERER}, timeout=10)), n)
+        if len(got) >= 5:
+            return got
+    except Exception:
+        pass
+    try:
+        return fetch_spark_nasdaq(sym, n)
+    except Exception:
+        return []
 
 
 def fetch_spark_tencent(code, n=20):

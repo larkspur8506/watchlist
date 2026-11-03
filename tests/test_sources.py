@@ -86,10 +86,12 @@ class TestSpark(unittest.TestCase):
     def test_url_keeps_jsonp_percent_encoding(self):
         """回归：URL 里的 %20 曾被 % 格式化吃掉并抛 ValueError（spark 全空）。"""
         seen = {}
+        rows = ",".join('{"d":"2026-10-%02d","o":"1","h":"1","l":"1","c":"%d","v":"1","a":"0"}'
+                        % (20 + i, 35 + i) for i in range(6))
 
         def fake_http(url, headers=None, timeout=8):
             seen["url"] = url
-            return SINA_DAILYK.encode("utf-8")
+            return ('var k([%s]);' % rows).encode("utf-8")
 
         old = sources._http
         sources._http = fake_http
@@ -97,7 +99,7 @@ class TestSpark(unittest.TestCase):
             out = sources.fetch_spark_us("schd")
         finally:
             sources._http = old
-        self.assertEqual(len(out), 3)
+        self.assertEqual(len(out), 6)
         self.assertIn("var%20k/", seen["url"])
         self.assertTrue(seen["url"].endswith("symbol=SCHD"))
 
@@ -172,6 +174,38 @@ class TestSparkLSE(unittest.TestCase):
             """)
             con.commit(); con.close()
             self.assertEqual(sources.fetch_spark_lse("IITU", 20, db=db), [])
+
+
+NASDAQ_HIST = {"data": {"tradesTable": {"rows": [
+    {"date": "11/02/2026", "close": "$98.31"},
+    {"date": "10/30/2026", "close": "$98.36"},
+    {"date": "10/29/2026", "close": "$99.49"},
+]}}}
+
+
+class TestSparkUSFallback(unittest.TestCase):
+    """回归：新浪对连发的第 13 个请求偶发返回空（AVGE 实案），必须退 Nasdaq 接口而不是留白。"""
+
+    def test_nasdaq_hist_ascending(self):
+        self.assertEqual(sources.parse_nasdaq_hist(NASDAQ_HIST), [99.49, 98.36, 98.31])
+
+    def test_empty_sina_falls_back_to_nasdaq(self):
+        calls = []
+
+        def fake_http(url, headers=None, timeout=8):
+            calls.append(url)
+            if "sina" in url:
+                return b'/*<script>*/var k([]);'      # 新浪返回空数组
+            return json.dumps(NASDAQ_HIST).encode()
+
+        old = sources._http
+        sources._http = fake_http
+        try:
+            got = sources.fetch_spark_us("AVGE")
+        finally:
+            sources._http = old
+        self.assertEqual(got, [99.49, 98.36, 98.31])
+        self.assertTrue(any("nasdaq.com" in c for c in calls))
 
 
 if __name__ == "__main__":
